@@ -10,6 +10,14 @@ const cleanCode = (code: string, lang: Language) => {
 		.split(/\r?\n/)
 		.map((line) => line.replace(/\/\/.*$/, '').trim())
 		.filter((line) => line !== '')
+		.map((line) => {
+			if (['ts', 'tsx', 'js', 'jsx'].includes(lang)) {
+				return line.startsWith('import') && !line.endsWith(';')
+					? line + ';'
+					: line
+			}
+			return line
+		})
 
 	if (lang === 'sql') {
 		return withoutLineComments.join(' ')
@@ -19,12 +27,6 @@ const cleanCode = (code: string, lang: Language) => {
 			.map((line) => (line.endsWith(';') ? line : line + ' '))
 			.join('')
 			.replace(/\s+/g, ' ')
-			.trim()
-	}
-	if (['ts', 'tsx', 'js', 'jsx'].includes(lang)) {
-		return withoutLineComments
-			.map((line) => (line.endsWith(';') ? line : line + ';'))
-			.join(' ')
 			.trim()
 	}
 	return withoutLineComments.join(' ')
@@ -127,7 +129,7 @@ export default function LimpiarCodigo({ changeView }: PageProps) {
 					</div>
 					<button
 						onClick={handleClear}
-						className="bg-red-700 text-white px-4 py-2 rounded-md hover:bg-red-800"
+						className="bg-red-700 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-red-800"
 					>
 						Limpiar campo
 					</button>
