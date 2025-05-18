@@ -41,12 +41,13 @@ export default function ColorConverter({ changeView }: PageProps) {
 	return (
 		<div className="min-h-screen flex bg-[#1e1e1e] text-white font-sans p-6 max-w-xl mx-auto">
 			<div className="w-full">
-				<div className="flex items-center gap-x-1.5 text-lg font-semibold mb-4">
-					<button className="cursor-pointer" onClick={changeView}>
-						<ChevronLeft />
-					</button>
+				<button
+					className="flex items-center gap-x-1.5 text-lg font-semibold mb-4 cursor-pointer w-full"
+					onClick={changeView}
+				>
+					<ChevronLeft />
 					<h2>Convertidor de Color</h2>
-				</div>
+				</button>
 
 				<input
 					value={input}

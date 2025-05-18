@@ -106,12 +106,13 @@ export default function ConvertToExcel({ changeView }: PageProps) {
 	return (
 		<div className="min-h-screen flex bg-[#1e1e1e] text-white font-sans">
 			<aside className="w-52 bg-[#202123] text-white p-4 space-y-1.5 border-r border-gray-700">
-				<div className="flex items-center gap-x-1.5 text-lg font-semibold mb-4">
-					<button className="cursor-pointer" onClick={changeView}>
-						<ChevronLeft />
-					</button>
+				<button
+					className="flex items-center gap-x-1.5 text-lg font-semibold mb-4 cursor-pointer w-full"
+					onClick={changeView}
+				>
+					<ChevronLeft />
 					<h2>Tipo</h2>
-				</div>
+				</button>
 				{convertToExcelModel.map((lang) => (
 					<button
 						key={lang}
