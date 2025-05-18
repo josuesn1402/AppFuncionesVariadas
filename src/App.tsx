@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import LimpiarCodigo from './pages/LimpiarCodigo'
-import Colores from './pages/Colores.tsx'
+import ColorConverter from './pages/ColorConverter'
 import MarkDown from './pages/MarkDown.tsx'
 
 type View = 'limpiarCodigo' | 'colores' | 'markDown' | null
@@ -55,7 +55,7 @@ export default function App() {
 						<LimpiarCodigo changeView={() => changeView(null)} />
 					)}
 					{activeView === 'colores' && (
-						<Colores changeView={() => changeView(null)} />
+						<ColorConverter changeView={() => changeView(null)} />
 					)}
 					{activeView === 'markDown' && (
 						<MarkDown changeView={() => changeView(null)} />
