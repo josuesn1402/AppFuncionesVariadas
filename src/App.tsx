@@ -1,9 +1,23 @@
 import { useState } from 'react'
 import LimpiarCodigo from './pages/LimpiarCodigo'
 import ColorConverter from './pages/ColorConverter'
-import MarkDown from './pages/MarkDown.tsx'
+import ConvertToExcel from './pages/ConvertToExcel.tsx'
 
-type View = 'limpiarCodigo' | 'colores' | 'markDown' | null
+type View =
+	| 'limpiarCodigo'
+	| 'colores'
+	// | 'markDown'
+	| 'convertToExcel'
+	// | 'arrayToExcel'
+	| null
+
+const views = [
+	{ id: 'limpiarCodigo', label: 'Limpiar Código' },
+	{ id: 'colores', label: 'Colores' },
+	// { id: 'markDown', label: 'MarkDown' },
+	{ id: 'convertToExcel', label: 'Convertir a Excel' }
+	// { id: 'arrayToExcel', label: 'Array a Excel' }
+]
 
 export default function App() {
 	const [activeView, setActiveView] = useState<View>(null)
@@ -16,39 +30,23 @@ export default function App() {
 		<>
 			{!activeView && (
 				<div className="min-h-screen flex bg-[#1e1e1e] text-white font-sans">
-					{/* Sidebar */}
 					<aside className="w-48 bg-gray-900 text-white p-4 space-y-2">
 						<h2 className="text-lg font-semibold mb-4">Vistas</h2>
-						<button
-							className={`block w-full text-left px-3 py-2 rounded cursor-pointer ${
-								activeView === 'limpiarCodigo'
-									? 'bg-blue-600'
-									: 'hover:bg-gray-700'
-							}`}
-							onClick={() => changeView('limpiarCodigo')}
-						>
-							Limpiar Código
-						</button>
-						<button
-							className={`block w-full text-left px-3 py-2 rounded cursor-pointer ${
-								activeView === 'colores' ? 'bg-blue-600' : 'hover:bg-gray-700'
-							}`}
-							onClick={() => changeView('colores')}
-						>
-							Colores
-						</button>
-						<button
-							className={`block w-full text-left px-3 py-2 rounded cursor-pointer ${
-								activeView === 'markDown' ? 'bg-blue-600' : 'hover:bg-gray-700'
-							}`}
-							onClick={() => changeView('markDown')}
-						>
-							MarkDown
-						</button>
+						{views.map(({ id, label }) => (
+							<button
+								key={id}
+								className={`block w-full text-left px-3 py-2 rounded cursor-pointer ${
+									activeView === id ? 'bg-blue-600' : 'hover:bg-gray-700'
+								}`}
+								onClick={() => changeView(id as View)}
+							>
+								{label}
+							</button>
+						))}
 					</aside>
 				</div>
 			)}
-			{/* Contenido principal */}
+
 			{activeView && (
 				<>
 					{activeView === 'limpiarCodigo' && (
@@ -57,9 +55,15 @@ export default function App() {
 					{activeView === 'colores' && (
 						<ColorConverter changeView={() => changeView(null)} />
 					)}
-					{activeView === 'markDown' && (
+					{/* {activeView === 'markDown' && (
 						<MarkDown changeView={() => changeView(null)} />
+					)}*/}
+					{activeView === 'convertToExcel' && (
+						<ConvertToExcel changeView={() => changeView(null)} />
 					)}
+					{/* {activeView === 'arrayToExcel' && (
+						<ArrayToExcel changeView={() => changeView(null)} />
+					)} */}
 				</>
 			)}
 		</>
