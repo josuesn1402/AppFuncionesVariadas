@@ -29,8 +29,8 @@ export default function App() {
 	return (
 		<>
 			{!activeView && (
-				<div className="min-h-screen flex bg-[#1e1e1e] text-white font-sans">
-					<aside className="w-48 bg-gray-900 text-white p-4 space-y-2">
+				<div className="min-h-screen flex text-white font-sans">
+					<aside className="w-52 bg-[#202123] text-white p-4 space-y-1.5 border-r border-gray-700">
 						<h2 className="text-lg font-semibold mb-4">Vistas</h2>
 						{views.map(({ id, label }) => (
 							<button

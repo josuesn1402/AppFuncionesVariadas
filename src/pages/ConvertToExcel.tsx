@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Clipboard, Check, ChevronLeft, Download } from 'lucide-react'
 import { saveAs } from 'file-saver'
 import * as XLSX from 'xlsx'
-
 import type { PageProps } from '../models/props'
 import {
 	convertToExcelModel,
 	type ConvertToExcelModel
 } from '../models/ConvertToExcel'
+import { validateConvertToExcelSyntax } from '../hooks/useValidateSyntaxWithBabel'
 
 type Format = 'xlsx' | 'xls' | 'csv'
 
@@ -17,7 +17,9 @@ const parseInput = (input: string, type: ConvertToExcelModel): any[] => {
 		if (type === 'json') {
 			if (Array.isArray(parsed)) return parsed
 			return [parsed]
-		} else if (type === 'array') {
+		} else if (type === 'array.ts') {
+			return parsed
+		} else if (type === 'array.js') {
 			return parsed
 		}
 		return []
@@ -26,26 +28,28 @@ const parseInput = (input: string, type: ConvertToExcelModel): any[] => {
 	}
 }
 
-const exportToExcel = (data: any[], format: Format, fileName = 'archivo') => {
+const exportToExcel = (
+	data: any[],
+	format: Format,
+	fileName = 'archivo',
+	sheetName = 'Hoja1',
+	fontName = 'Calibri',
+	fontSize = 11
+) => {
 	const processedData = data.map((row) => {
 		const newRow: Record<string, any> = {}
 		Object.entries(row).forEach(([key, value]) => {
 			if (typeof value === 'string') {
-				// Intentar convertir a número
 				const num = Number(value)
 				if (!isNaN(num) && value.trim() !== '') {
 					newRow[key] = num
 					return
 				}
-
-				// Intentar convertir a fecha válida
 				const date = new Date(value)
 				if (!isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
 					newRow[key] = date
 					return
 				}
-
-				// Si no es número ni fecha válida, dejar como string
 				newRow[key] = value
 			} else {
 				newRow[key] = value
@@ -55,16 +59,45 @@ const exportToExcel = (data: any[], format: Format, fileName = 'archivo') => {
 	})
 
 	const worksheet = XLSX.utils.json_to_sheet(processedData)
+
+	// Aplicar estilo global a todas las celdas
+	const range = XLSX.utils.decode_range(worksheet['!ref'] || '')
+	for (let R = range.s.r; R <= range.e.r; ++R) {
+		for (let C = range.s.c; C <= range.e.c; ++C) {
+			const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+			const cell = worksheet[cellAddress]
+			if (cell && typeof cell === 'object') {
+				cell.s = {
+					font: {
+						name: fontName,
+						sz: fontSize
+					}
+				}
+			}
+		}
+	}
+
 	const workbook = XLSX.utils.book_new()
-	XLSX.utils.book_append_sheet(workbook, worksheet, 'Hoja1')
-	const extension = format === 'csv' ? 'csv' : 'xlsx'
-	const excelBuffer = XLSX.write(workbook, { bookType: format, type: 'array' })
-	const blob = new Blob([excelBuffer], {
-		type:
-			format === 'csv'
-				? 'text/csv;charset=utf-8;'
-				: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+	XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
+
+	const extension = format === 'csv' ? 'csv' : format === 'xls' ? 'xls' : 'xlsx'
+	const bookType =
+		format === 'csv' ? 'csv' : format === 'xls' ? 'biff8' : 'xlsx'
+
+	const excelBuffer = XLSX.write(workbook, {
+		bookType,
+		type: 'array',
+		cellStyles: true
 	})
+
+	const mimeType =
+		format === 'csv'
+			? 'text/csv;charset=utf-8;'
+			: format === 'xls'
+			? 'application/vnd.ms-excel'
+			: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+	const blob = new Blob([excelBuffer], { type: mimeType })
 	saveAs(blob, `${fileName}.${extension}`)
 }
 
@@ -75,13 +108,27 @@ export default function ConvertToExcel({ changeView }: PageProps) {
 	const [copied, setCopied] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 
+	// Nuevos estados para opciones
+	const [fileName, setFileName] = useState('archivo')
+	const [sheetName, setSheetName] = useState('Hoja1')
+	const [fontName, setFontName] = useState('Calibri')
+	const [fontSize, setFontSize] = useState(11)
+
 	const handleExport = (format: Format) => {
 		setError(null)
+		const syntaxError = validateConvertToExcelSyntax(
+			input,
+			convertToExcelModelData
+		)
+		if (syntaxError) {
+			setError(syntaxError)
+			return
+		}
 		try {
 			const data = parseInput(input, convertToExcelModelData)
 			if (!Array.isArray(data))
 				throw new Error('La entrada no es un array válido.')
-			exportToExcel(data, format)
+			exportToExcel(data, format, fileName, sheetName, fontName, fontSize)
 		} catch (err: any) {
 			setError(err.message || 'Error al exportar')
 		}
@@ -129,6 +176,55 @@ export default function ConvertToExcel({ changeView }: PageProps) {
 			</aside>
 			<main className="flex-1 p-6 bg-[#343541]">
 				<h1 className="text-2xl font-bold mb-4">Convertir a Excel</h1>
+
+				{/* Inputs para nombre archivo, hoja, fuente y tamaño */}
+				<div className="mb-4 w-full grid grid-cols-2 md:grid-cols-4 gap-4">
+					<div>
+						<label className="block mb-1 font-semibold">
+							Nombre de archivo
+						</label>
+						<input
+							type="text"
+							value={fileName}
+							onChange={(e) => setFileName(e.target.value)}
+							className="w-full p-2 rounded bg-[#40414f] border border-gray-600 text-white"
+							placeholder="archivo"
+						/>
+					</div>
+					<div>
+						<label className="block mb-1 font-semibold">Nombre de hoja</label>
+						<input
+							type="text"
+							value={sheetName}
+							onChange={(e) => setSheetName(e.target.value)}
+							className="w-full p-2 rounded bg-[#40414f] border border-gray-600 text-white"
+							placeholder="Hoja1"
+						/>
+					</div>
+					<div>
+						<label className="block mb-1 font-semibold">Fuente</label>
+						<input
+							type="text"
+							value={fontName}
+							onChange={(e) => setFontName(e.target.value)}
+							className="w-full p-2 rounded bg-[#40414f] border border-gray-600 text-white"
+							placeholder="Calibri"
+						/>
+					</div>
+					<div>
+						<label className="block mb-1 font-semibold">Tamaño de fuente</label>
+						<input
+							type="number"
+							min={1}
+							max={72}
+							value={fontSize}
+							onChange={(e) => setFontSize(Number(e.target.value))}
+							className="w-full p-2 rounded bg-[#40414f] border border-gray-600 text-white"
+							placeholder="11"
+						/>
+					</div>
+				</div>
+
 				<textarea
 					rows={10}
 					className="w-full p-3 rounded bg-[#40414f] text-white border border-gray-600 mb-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -136,56 +232,47 @@ export default function ConvertToExcel({ changeView }: PageProps) {
 					value={input}
 					onChange={(e) => setInput(e.target.value)}
 				/>
+
 				<div className="mb-4 flex flex-wrap gap-3 justify-between">
 					<div className="flex gap-2 flex-wrap">
 						<button
 							onClick={() => handleExport('xlsx')}
 							className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-green-700"
 						>
-							<Download size={16} />
-							Exportar XLSX
+							<Download size={16} /> Exportar XLSX
 						</button>
 						<button
 							onClick={() => handleExport('xls')}
 							className="bg-yellow-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-yellow-700"
 						>
-							<Download size={16} />
-							Exportar XLS
+							<Download size={16} /> Exportar XLS
 						</button>
 						<button
 							onClick={() => handleExport('csv')}
 							className="bg-indigo-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-indigo-700"
 						>
-							<Download size={16} />
-							Exportar CSV
+							<Download size={16} /> Exportar CSV
 						</button>
+					</div>
+
+					<div className="flex gap-2">
 						<button
 							onClick={handleCopy}
-							className="bg-gray-700 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-gray-600"
+							className="bg-gray-600 px-3 py-2 rounded-md hover:bg-gray-700 flex items-center gap-2"
 						>
-							{copied ? (
-								<>
-									<Check size={16} /> Copiado
-								</>
-							) : (
-								<>
-									<Clipboard size={16} /> Copiar entrada
-								</>
-							)}
+							{copied ? <Check size={16} /> : <Clipboard size={16} />}
+							{copied ? 'Copiado' : 'Copiar'}
+						</button>
+						<button
+							onClick={handleClear}
+							className="bg-red-600 px-3 py-2 rounded-md hover:bg-red-700"
+						>
+							Limpiar
 						</button>
 					</div>
-					<button
-						onClick={handleClear}
-						className="bg-red-700 text-white px-4 py-2 rounded-md hover:bg-red-800"
-					>
-						Limpiar campo
-					</button>
 				</div>
-				{error && (
-					<div className="mb-4 p-3 bg-red-700 text-white rounded">
-						<strong>Error:</strong> {error}
-					</div>
-				)}
+
+				{error && <p className="text-red-400 font-semibold">{error}</p>}
 			</main>
 		</div>
 	)

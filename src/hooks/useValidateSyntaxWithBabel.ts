@@ -1,6 +1,7 @@
 import * as babelParser from '@babel/parser'
 import type { ParserPlugin } from '@babel/parser'
 import type { Language } from '../models/LanguageModel'
+import type { ConvertToExcelModel } from '../models/ConvertToExcel'
 
 export function validateSyntaxWithBabel(
 	code: string,
@@ -114,4 +115,37 @@ export function validateSyntax(code: string, lang: Language): string | null {
 	// puedes agregar validaciones básicas o dejar pasar por ahora
 
 	return null
+}
+
+export function validateConvertToExcelSyntax(
+	code: string,
+	type: ConvertToExcelModel
+): string | null {
+	if (type === 'json') {
+		try {
+			JSON.parse(code)
+			return null
+		} catch (e) {
+			return (
+				'Error de sintaxis JSON: ' +
+				(e instanceof Error ? e.message : String(e))
+			)
+		}
+	}
+
+	if (type === 'array.ts' || type === 'array.js') {
+		try {
+			const plugins: ParserPlugin[] = ['jsx']
+			if (type === 'array.ts') plugins.push('typescript')
+			babelParser.parse(code, { sourceType: 'module', plugins })
+			return null
+		} catch (err: unknown) {
+			if (err instanceof Error) {
+				return 'Error de sintaxis en array: ' + err.message
+			}
+			return 'Error desconocido en sintaxis de array'
+		}
+	}
+
+	return 'Tipo no soportado para validación'
 }
