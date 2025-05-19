@@ -37,26 +37,35 @@ const exportToExcel = (
 	let finalData = data
 
 	if (format !== 'csv') {
-		// Para xlsx/xls hacemos la conversión a números y fechas
 		finalData = data.map((row) => {
 			const newRow: Record<string, any> = {}
 			Object.entries(row).forEach(([key, value]) => {
 				if (typeof value === 'string') {
 					const trimmed = value.trim()
+
+					if (
+						key.toLowerCase().includes('fecha') ||
+						key.toLowerCase().includes('hora') ||
+						key.toLowerCase().includes('created_at') ||
+						key.toLowerCase().includes('updated_at')
+					) {
+						const tieneHora = /T\d{2}:\d{2}|\s\d{2}:\d{2}/.test(trimmed)
+						const parsedDate = new Date(
+							tieneHora ? trimmed : trimmed + 'T00:00:00'
+						)
+						if (!isNaN(parsedDate.getTime())) {
+							parsedDate.setSeconds(parsedDate.getSeconds() + 36)
+							newRow[key] = parsedDate
+							return
+						}
+					}
+
 					const num = Number(trimmed)
 					if (!isNaN(num) && trimmed !== '') {
 						newRow[key] = num
 						return
 					}
-					const tieneHora = /T\d{2}:\d{2}|\s\d{2}:\d{2}/.test(trimmed)
-					const parsedDate = new Date(
-						tieneHora ? trimmed : trimmed + 'T00:00:00'
-					)
-					if (!isNaN(parsedDate.getTime())) {
-						parsedDate.setSeconds(parsedDate.getSeconds() + 36)
-						newRow[key] = parsedDate
-						return
-					}
+
 					newRow[key] = value
 				} else {
 					newRow[key] = value
@@ -86,13 +95,10 @@ const exportToExcel = (
 				const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
 				const cell = ws[cellAddress]
 				if (cell && typeof cell === 'object') {
-					cell.s = { font: { name: fontName, sz: fontSize } }
-					if (typeof cell.v === 'string') {
-						if (/\d{2}:\d{2}/.test(cell.v)) {
-							cell.z = 'dd/mm/yyyy hh:mm:ss'
-						} else if (/\d{2}\/\d{2}\/\d{4}/.test(cell.v)) {
-							cell.z = 'dd/mm/yyyy'
-						}
+					if (cell.v instanceof Date) {
+						cell.t = 'd'
+						cell.s = { font: { name: fontName, sz: fontSize } }
+						cell.z = 'dd/mm/yyyy hh:mm:ss'
 					}
 				}
 			}
@@ -109,7 +115,7 @@ const exportToExcel = (
 		bookType,
 		type: 'array',
 		cellDates: true,
-		cellStyles: format === 'xlsx'
+		cellStyles: true
 	})
 
 	const mimeType =
