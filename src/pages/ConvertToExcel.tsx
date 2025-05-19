@@ -17,9 +17,7 @@ const parseInput = (input: string, type: ConvertToExcelModel): any[] => {
 		if (type === 'json') {
 			if (Array.isArray(parsed)) return parsed
 			return [parsed]
-		} else if (type === 'array.ts') {
-			return parsed
-		} else if (type === 'array.js') {
+		} else if (type === 'array.ts' || type === 'array.js') {
 			return parsed
 		}
 		return []
@@ -36,43 +34,64 @@ const exportToExcel = (
 	fontName = 'Calibri',
 	fontSize = 11
 ) => {
-	// Preparar datos (convertir strings a números o fechas)
-	const processedData = data.map((row) => {
-		const newRow: Record<string, any> = {}
-		Object.entries(row).forEach(([key, value]) => {
-			if (typeof value === 'string') {
-				const num = Number(value)
-				if (!isNaN(num) && value.trim() !== '') {
-					newRow[key] = num
-					return
+	let finalData = data
+
+	if (format !== 'csv') {
+		// Para xlsx/xls hacemos la conversión a números y fechas
+		finalData = data.map((row) => {
+			const newRow: Record<string, any> = {}
+			Object.entries(row).forEach(([key, value]) => {
+				if (typeof value === 'string') {
+					const trimmed = value.trim()
+					const num = Number(trimmed)
+					if (!isNaN(num) && trimmed !== '') {
+						newRow[key] = num
+						return
+					}
+					const tieneHora = /T\d{2}:\d{2}|\s\d{2}:\d{2}/.test(trimmed)
+					const parsedDate = new Date(
+						tieneHora ? trimmed : trimmed + 'T00:00:00'
+					)
+					if (!isNaN(parsedDate.getTime())) {
+						parsedDate.setSeconds(parsedDate.getSeconds() + 36)
+						newRow[key] = parsedDate
+						return
+					}
+					newRow[key] = value
+				} else {
+					newRow[key] = value
 				}
-				const date = new Date(value)
-				if (!isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-					newRow[key] = date
-					return
-				}
-				newRow[key] = value
-			} else {
-				newRow[key] = value
-			}
+			})
+			return newRow
 		})
-		return newRow
-	})
+	}
 
-	const worksheet = XLSX.utils.json_to_sheet(processedData)
+	if (format === 'csv') {
+		// Para csv exportamos la data en bruto sin convertir
+		const csvContent = XLSX.utils.sheet_to_csv(
+			XLSX.utils.json_to_sheet(finalData)
+		)
+		const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+		saveAs(blob, `${fileName}.csv`)
+		return
+	}
 
-	// Aplicar estilos solo si es xlsx, no a xls o csv
+	// Para xlsx y xls:
+	const ws = XLSX.utils.json_to_sheet(finalData)
+
 	if (format === 'xlsx') {
-		const range = XLSX.utils.decode_range(worksheet['!ref'] || '')
+		const range = XLSX.utils.decode_range(ws['!ref'] || '')
 		for (let R = range.s.r; R <= range.e.r; ++R) {
 			for (let C = range.s.c; C <= range.e.c; ++C) {
 				const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
-				const cell = worksheet[cellAddress]
+				const cell = ws[cellAddress]
 				if (cell && typeof cell === 'object') {
-					cell.s = {
-						font: {
-							name: fontName,
-							sz: fontSize
+					cell.s = { font: { name: fontName, sz: fontSize } }
+					if (typeof cell.v === 'string') {
+						if (/\d{2}:\d{2}/.test(cell.v)) {
+							cell.z = 'dd/mm/yyyy hh:mm:ss'
+						} else if (/\d{2}\/\d{2}\/\d{4}/.test(cell.v)) {
+							cell.z = 'dd/mm/yyyy'
 						}
 					}
 				}
@@ -80,23 +99,21 @@ const exportToExcel = (
 		}
 	}
 
-	const workbook = XLSX.utils.book_new()
-	XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
+	const wb = XLSX.utils.book_new()
+	XLSX.utils.book_append_sheet(wb, ws, sheetName)
 
-	const extension = format === 'csv' ? 'csv' : format === 'xls' ? 'xls' : 'xlsx'
-	const bookType =
-		format === 'csv' ? 'csv' : format === 'xls' ? 'biff8' : 'xlsx'
+	const extension = format === 'xls' ? 'xls' : 'xlsx'
+	const bookType = format === 'xls' ? 'biff8' : 'xlsx'
 
-	const excelBuffer = XLSX.write(workbook, {
+	const excelBuffer = XLSX.write(wb, {
 		bookType,
 		type: 'array',
-		cellStyles: format === 'xlsx' // solo true para xlsx
+		cellDates: true,
+		cellStyles: format === 'xlsx'
 	})
 
 	const mimeType =
-		format === 'csv'
-			? 'text/csv;charset=utf-8;'
-			: format === 'xls'
+		format === 'xls'
 			? 'application/vnd.ms-excel'
 			: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -110,8 +127,6 @@ export default function ConvertToExcel({ changeView }: PageProps) {
 	const [input, setInput] = useState('')
 	const [copied, setCopied] = useState(false)
 	const [error, setError] = useState<string | null>(null)
-
-	// Nuevos estados para opciones
 	const [fileName, setFileName] = useState('archivo')
 	const [sheetName, setSheetName] = useState('Hoja1')
 	const [fontName, setFontName] = useState('Calibri')
@@ -153,6 +168,42 @@ export default function ConvertToExcel({ changeView }: PageProps) {
 		setError(null)
 	}
 
+	const handleDrop = (event: React.DragEvent<HTMLTextAreaElement>) => {
+		event.preventDefault()
+		setError(null)
+
+		const files = event.dataTransfer.files
+		if (files.length === 0) return
+
+		const file = files[0]
+		const validTypes = ['application/json', 'text/plain']
+
+		if (!validTypes.includes(file.type) && !file.name.match(/\.(json|txt)$/i)) {
+			setError('Solo se permiten archivos JSON o TXT.')
+			return
+		}
+
+		const reader = new FileReader()
+		reader.onload = () => {
+			const text = reader.result as string
+			try {
+				// Validamos que sea JSON válido
+				JSON.parse(text)
+				setInput(text)
+			} catch {
+				setError('El archivo no contiene un JSON válido.')
+			}
+		}
+		reader.onerror = () => {
+			setError('Error al leer el archivo.')
+		}
+		reader.readAsText(file)
+	}
+
+	const handleDragOver = (event: React.DragEvent<HTMLTextAreaElement>) => {
+		event.preventDefault()
+	}
+
 	return (
 		<div className="min-h-screen flex bg-[#1e1e1e] text-white font-sans">
 			<aside className="w-52 bg-[#202123] text-white p-4 space-y-1.5 border-r border-gray-700">
@@ -163,17 +214,17 @@ export default function ConvertToExcel({ changeView }: PageProps) {
 					<ChevronLeft />
 					<h2>Tipo</h2>
 				</button>
-				{convertToExcelModel.map((lang) => (
+				{convertToExcelModel.map((type) => (
 					<button
-						key={lang}
-						onClick={() => handleConvertToExcelModelChange(lang)}
+						key={type}
+						onClick={() => handleConvertToExcelModelChange(type)}
 						className={`block w-full text-left px-3 py-2 rounded text-sm cursor-pointer ${
-							convertToExcelModelData === lang
+							convertToExcelModelData === type
 								? 'bg-blue-600 text-white'
 								: 'hover:bg-gray-700'
 						}`}
 					>
-						{lang.toUpperCase()}
+						{type.toUpperCase()}
 					</button>
 				))}
 			</aside>
@@ -231,9 +282,11 @@ export default function ConvertToExcel({ changeView }: PageProps) {
 				<textarea
 					rows={10}
 					className="w-full p-3 rounded bg-[#40414f] text-white border border-gray-600 mb-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-					placeholder="Pega tu JSON o Array aquí..."
+					placeholder="Pega tu JSON o Array aquí o arrastra un archivo..."
 					value={input}
 					onChange={(e) => setInput(e.target.value)}
+					onDrop={handleDrop}
+					onDragOver={handleDragOver}
 				/>
 
 				<div className="mb-4 flex flex-wrap gap-3 justify-between">

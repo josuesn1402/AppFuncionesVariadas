@@ -2,7 +2,6 @@ import { useState } from 'react'
 import LimpiarCodigo from './pages/LimpiarCodigo'
 import ColorConverter from './pages/ColorConverter'
 import ConvertToExcel from './pages/ConvertToExcel.tsx'
-import { ExportFechas } from './testExcel.tsx'
 
 type View =
 	| 'limpiarCodigo'
@@ -29,8 +28,6 @@ export default function App() {
 
 	return (
 		<>
-			<ExportFechas />
-
 			{!activeView && (
 				<div className="min-h-screen flex text-white font-sans">
 					<aside className="w-52 bg-[#202123] text-white p-4 space-y-1.5 border-r border-gray-700">
