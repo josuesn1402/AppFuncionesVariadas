@@ -88,17 +88,36 @@ const exportToExcel = (
 	// Para xlsx y xls:
 	const ws = XLSX.utils.json_to_sheet(finalData)
 
-	if (format === 'xlsx') {
+	if (format === 'xlsx' || format === 'xls') {
+		const isFechaKey = (key: string) =>
+			/(fecha|hora|created_at|updated_at)/i.test(key)
+
 		const range = XLSX.utils.decode_range(ws['!ref'] || '')
 		for (let R = range.s.r; R <= range.e.r; ++R) {
 			for (let C = range.s.c; C <= range.e.c; ++C) {
-				const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
-				const cell = ws[cellAddress]
-				if (cell && typeof cell === 'object') {
-					if (cell.v instanceof Date) {
-						cell.t = 'd'
-						cell.s = { font: { name: fontName, sz: fontSize } }
-						cell.z = 'dd/mm/yyyy hh:mm:ss'
+				const addr = XLSX.utils.encode_cell({ r: R, c: C })
+				const cell = ws[addr]
+				const header =
+					ws[XLSX.utils.encode_cell({ r: range.s.r, c: C })]?.v?.toString() ||
+					''
+
+				if (!cell) continue
+
+				// Fechas ya manejadas antes
+				if (cell.v instanceof Date) {
+					cell.t = 'd'
+					cell.z = 'dd/mm/yyyy hh:mm:ss'
+					cell.s = {
+						font: { name: fontName, sz: fontSize }
+					}
+				}
+
+				// Si no es campo de fecha y es número
+				else if (!isFechaKey(header) && typeof cell.v === 'number') {
+					cell.t = 'n'
+					cell.z = '0'
+					cell.s = {
+						font: { name: fontName, sz: fontSize }
 					}
 				}
 			}
