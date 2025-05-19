@@ -39,7 +39,7 @@ export default function ColorConverter({ changeView }: PageProps) {
 	}
 
 	return (
-		<div className="min-h-screen flex bg-[#1e1e1e] text-white font-sans p-6 max-w-xl mx-auto">
+		<div className="min-h-screen flex bg-[#1e1e1e] text-white font-sans p-6">
 			<div className="w-full">
 				<button
 					className="flex items-center gap-x-1.5 text-lg font-semibold mb-4 cursor-pointer w-full"
