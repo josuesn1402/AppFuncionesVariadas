@@ -36,6 +36,7 @@ const exportToExcel = (
 	fontName = 'Calibri',
 	fontSize = 11
 ) => {
+	// Preparar datos (convertir strings a números o fechas)
 	const processedData = data.map((row) => {
 		const newRow: Record<string, any> = {}
 		Object.entries(row).forEach(([key, value]) => {
@@ -60,17 +61,19 @@ const exportToExcel = (
 
 	const worksheet = XLSX.utils.json_to_sheet(processedData)
 
-	// Aplicar estilo global a todas las celdas
-	const range = XLSX.utils.decode_range(worksheet['!ref'] || '')
-	for (let R = range.s.r; R <= range.e.r; ++R) {
-		for (let C = range.s.c; C <= range.e.c; ++C) {
-			const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
-			const cell = worksheet[cellAddress]
-			if (cell && typeof cell === 'object') {
-				cell.s = {
-					font: {
-						name: fontName,
-						sz: fontSize
+	// Aplicar estilos solo si es xlsx, no a xls o csv
+	if (format === 'xlsx') {
+		const range = XLSX.utils.decode_range(worksheet['!ref'] || '')
+		for (let R = range.s.r; R <= range.e.r; ++R) {
+			for (let C = range.s.c; C <= range.e.c; ++C) {
+				const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+				const cell = worksheet[cellAddress]
+				if (cell && typeof cell === 'object') {
+					cell.s = {
+						font: {
+							name: fontName,
+							sz: fontSize
+						}
 					}
 				}
 			}
@@ -87,7 +90,7 @@ const exportToExcel = (
 	const excelBuffer = XLSX.write(workbook, {
 		bookType,
 		type: 'array',
-		cellStyles: true
+		cellStyles: format === 'xlsx' // solo true para xlsx
 	})
 
 	const mimeType =
